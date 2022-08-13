@@ -129,7 +129,45 @@ class GcodeExtension(EffectExtension):
                             canvas_height=self.options.bed_height)
 
         gcode_compiler.append_curves(curves)
-        gcode_compiler.compile_to_file(output_path, passes=self.options.passes)
+        #gcode_compiler.compile_to_file(output_path, passes=self.options.passes)
+        
+        passes=self.options.passes
+        gcodeheader = []
+        gcode = []
+        gcodefooter = []
+        gcodeheader.append(';Header')
+        gcodeheader.extend(header)
+        gcodeheader.append(';Unit')
+        gcodeheader.append(self.options.unit)
+
+        file = open(output_path, 'w')
+        file.writelines("\n".join(gcodeheader))
+
+
+        gcode.append('\n;Body')
+
+        for i in range(passes):
+            #gcode.extend('\n;Pass: ')
+            #gcode.extend(str(i))
+            #gcode.extend('\n')
+            gcode.extend(gcode_compiler.body)
+
+            if i < passes - 1:  # If it isn't the last pass, turn off the laser and move down
+                gcode.append(self.interface.laser_off())
+
+                if self.pass_depth > 0:
+                    gcode.append(self.interface.set_relative_coordinates())
+                    gcode.append(self.interface.linear_move(z=-self.pass_depth))
+                    gcode.append(self.interface.set_absolute_coordinates())
+
+            gcode = filter(lambda command: len(command) > 0, gcode)
+            file.writelines("\n".join(gcode))
+ 
+        gcodefooter.append('\n;Footer')
+        gcodefooter.extend(footer)
+ 
+        file.writelines("\n".join(gcodefooter))
+        file.close()
 
         # Draw debug lines
         if self.options.draw_debug:
